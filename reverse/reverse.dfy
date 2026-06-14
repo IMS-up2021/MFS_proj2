@@ -1,3 +1,23 @@
+// ------------------------------------------------------------
+// reverse.dfy
+//
+// Verified implementation of a line-reversal utility.
+//
+// Usage:
+//     ./reverse <source> <destination>
+//
+// Creates the destination file containing all lines from the
+// source file in reverse order.
+//
+// The executable implementation uses a straightforward approach of
+// reading the entire file into memory, reversing it, and writing
+// it back out. The expected behaviour is specified using a functional
+// specification of the reversal operation.
+// ------------------------------------------------------------
+
+
+
+
 include "Io.dfy"
 
 const NEWLINE := 0x0A as byte

@@ -1,3 +1,20 @@
+// ------------------------------------------------------------
+// grep.dfy
+//
+// Verified implementation of a grep-like utility.
+//
+// Usage:
+//     ./grep <word> <file>
+//
+// Prints:
+//     YES: n   if the first occurrence of <word> is at position n
+//     NO        otherwise.
+//
+// The executable implementation uses the Knuth-Morris-Pratt (KMP)
+// algorithm. The expected behaviour is specified using a naive
+// search specification.
+// ------------------------------------------------------------
+
 include "Io.dfy"
 
 // ---------- Char/byte conversion ----------
