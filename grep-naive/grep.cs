@@ -9,44 +9,91 @@ using System;
 using System.Numerics;
 using System.Collections;
 [assembly: DafnyAssembly.DafnySourceAttribute(@"// dafny 4.11.0.0
-// Command Line Options: .\grep.dfy .\IoNative.cs
+// Command-line arguments: build .\grep.dfy .\IoNative.cs
 // grep.dfy
 
-method NaiveSearch(txt: array<byte>, pat: array<byte>)
-    returns (found: bool, index: int)
+method ContainsWord(txt: array<byte>, txtStart: int, txtEnd: int, pat: array<byte>)
+    returns (found: bool)
   requires pat.Length > 0
-  ensures found ==> 0 <= index <= txt.Length - pat.Length
-  decreases txt, pat
+  requires 0 <= txtStart <= txtEnd <= txt.Length
+  decreases txt, txtStart, txtEnd, pat
 {
-  var N := txt.Length;
+  var len := txtEnd - txtStart;
   var M := pat.Length;
-  if N < M {
-    return false, -1;
+  if len < M {
+    return false;
   }
   var i := 0;
-  while i <= N - M
-    invariant 0 <= i <= N - M + 1
-    decreases N - i
+  while i <= len - M
+    invariant 0 <= i <= len - M + 1
+    decreases len - i
   {
     var j := 0;
-    var matchFound := true;
     while j < M
       invariant 0 <= j <= M
-      invariant i + j <= N
+      invariant txtStart + i + j <= txtEnd
       decreases M - j
     {
-      if txt[i + j] != pat[j] {
-        matchFound := false;
+      if txt[txtStart + i + j] != pat[j] {
         break;
       }
       j := j + 1;
     }
-    if matchFound {
-      return true, i;
+    if j == M {
+      return true;
     }
     i := i + 1;
   }
-  return false, -1;
+  return false;
+}
+
+method PrintBufferSegment(buffer: array<byte>, start: int, end: int)
+  requires 0 <= start <= end <= buffer.Length
+  decreases buffer, start, end
+{
+  var s: string := [];
+  var k := start;
+  while k < end
+    invariant start <= k <= end
+    decreases end - k
+  {
+    if buffer[k] != 13 {
+      s := s + [buffer[k] as char];
+    }
+    k := k + 1;
+  }
+  print s;
+  print ""\n"";
+}
+
+method GrepLines(buffer: array<byte>, pat: array<byte>)
+  requires pat.Length > 0
+  decreases buffer, pat
+{
+  var i := 0;
+  var line_start := 0;
+  while i < buffer.Length
+    invariant 0 <= i <= buffer.Length
+    invariant 0 <= line_start <= i + 1
+    decreases buffer.Length - i
+  {
+    if buffer[i] == 10 {
+      if line_start <= i {
+        var found := ContainsWord(buffer, line_start, i, pat);
+        if found {
+          PrintBufferSegment(buffer, line_start, i);
+        }
+      }
+      line_start := i + 1;
+    }
+    i := i + 1;
+  }
+  if line_start <= buffer.Length {
+    var found := ContainsWord(buffer, line_start, buffer.Length, pat);
+    if found {
+      PrintBufferSegment(buffer, line_start, buffer.Length);
+    }
+  }
 }
 
 method {:main} Main(ghost env: HostEnvironment?, _noArgsParameter: seq<seq<char>>)
@@ -67,23 +114,19 @@ method {:main} Main(ghost env: HostEnvironment?, _noArgsParameter: seq<seq<char>
   }
   var fileExists := FileStream.FileExists(fileArg, env);
   if !fileExists {
-    print ""NO\n"";
     return;
   }
   var success, len := FileStream.FileLength(fileArg, env);
   if !success || len < 0 {
-    print ""NO\n"";
     return;
   }
   var ok, f := FileStream.Open(fileArg, env);
   if !ok {
-    print ""NO\n"";
     return;
   }
   var buffer := new byte[len];
   ok := f.Read(0 as nat32, buffer, 0 as int32, len);
   if !ok {
-    print ""NO\n"";
     return;
   }
   var closeOk := f.Close();
@@ -97,14 +140,7 @@ method {:main} Main(ghost env: HostEnvironment?, _noArgsParameter: seq<seq<char>
     wordBytes[k] := if 0 <= charVal < 256 then charVal as byte else 63;
     k := k + 1;
   }
-  var found, idx := NaiveSearch(buffer, wordBytes);
-  if found {
-    print ""YES: "";
-    print idx;
-    print ""\n"";
-  } else {
-    print ""NO\n"";
-  }
+  GrepLines(buffer, wordBytes);
 }
 
 newtype {:nativeType ""byte""} byte = b: int
@@ -5950,51 +5986,85 @@ internal static class FuncExtensions {
 namespace _module {
 
   public partial class __default {
-    public static void NaiveSearch(byte[] txt, byte[] pat, out bool found, out BigInteger index)
+    public static bool ContainsWord(byte[] txt, BigInteger txtStart, BigInteger txtEnd, byte[] pat)
     {
-      found = false;
-      index = BigInteger.Zero;
-      BigInteger _0_N;
-      _0_N = new BigInteger((txt).Length);
+      bool found = false;
+      BigInteger _0_len;
+      _0_len = (txtEnd) - (txtStart);
       BigInteger _1_M;
       _1_M = new BigInteger((pat).Length);
-      if ((_0_N) < (_1_M)) {
-        bool _rhs0 = false;
-        BigInteger _rhs1 = new BigInteger(-1);
-        found = _rhs0;
-        index = _rhs1;
-        return ;
+      if ((_0_len) < (_1_M)) {
+        found = false;
+        return found;
       }
       BigInteger _2_i;
       _2_i = BigInteger.Zero;
-      while ((_2_i) <= ((_0_N) - (_1_M))) {
+      while ((_2_i) <= ((_0_len) - (_1_M))) {
         BigInteger _3_j;
         _3_j = BigInteger.Zero;
-        bool _4_matchFound;
-        _4_matchFound = true;
         while ((_3_j) < (_1_M)) {
-          if (((txt)[(int)((_2_i) + (_3_j))]) != ((pat)[(int)(_3_j)])) {
-            _4_matchFound = false;
+          if (((txt)[(int)(((txtStart) + (_2_i)) + (_3_j))]) != ((pat)[(int)(_3_j)])) {
             goto after_1_0;
           }
           _3_j = (_3_j) + (BigInteger.One);
         continue_1_0: ;
         }
       after_1_0: ;
-        if (_4_matchFound) {
-          bool _rhs2 = true;
-          BigInteger _rhs3 = _2_i;
-          found = _rhs2;
-          index = _rhs3;
-          return ;
+        if ((_3_j) == (_1_M)) {
+          found = true;
+          return found;
         }
         _2_i = (_2_i) + (BigInteger.One);
       }
-      bool _rhs4 = false;
-      BigInteger _rhs5 = new BigInteger(-1);
-      found = _rhs4;
-      index = _rhs5;
-      return ;
+      found = false;
+      return found;
+      return found;
+    }
+    public static void PrintBufferSegment(byte[] buffer, BigInteger start, BigInteger end)
+    {
+      Dafny.ISequence<Dafny.Rune> _0_s;
+      _0_s = Dafny.Sequence<Dafny.Rune>.FromElements();
+      BigInteger _1_k;
+      _1_k = start;
+      while ((_1_k) < (end)) {
+        if (((buffer)[(int)(_1_k)]) != ((byte)(13))) {
+          _0_s = Dafny.Sequence<Dafny.Rune>.Concat(_0_s, Dafny.Sequence<Dafny.Rune>.FromElements(new Dafny.Rune((int)((buffer)[(int)(_1_k)]))));
+        }
+        _1_k = (_1_k) + (BigInteger.One);
+      }
+      Dafny.Helpers.Print((_0_s).ToVerbatimString(false));
+      Dafny.Helpers.Print((Dafny.Sequence<Dafny.Rune>.UnicodeFromString("\n")).ToVerbatimString(false));
+    }
+    public static void GrepLines(byte[] buffer, byte[] pat)
+    {
+      BigInteger _0_i;
+      _0_i = BigInteger.Zero;
+      BigInteger _1_line__start;
+      _1_line__start = BigInteger.Zero;
+      while ((_0_i) < (new BigInteger((buffer).Length))) {
+        if (((buffer)[(int)(_0_i)]) == ((byte)(10))) {
+          if ((_1_line__start) <= (_0_i)) {
+            bool _2_found;
+            bool _out0;
+            _out0 = __default.ContainsWord(buffer, _1_line__start, _0_i, pat);
+            _2_found = _out0;
+            if (_2_found) {
+              __default.PrintBufferSegment(buffer, _1_line__start, _0_i);
+            }
+          }
+          _1_line__start = (_0_i) + (BigInteger.One);
+        }
+        _0_i = (_0_i) + (BigInteger.One);
+      }
+      if ((_1_line__start) <= (new BigInteger((buffer).Length))) {
+        bool _3_found;
+        bool _out1;
+        _out1 = __default.ContainsWord(buffer, _1_line__start, new BigInteger((buffer).Length), pat);
+        _3_found = _out1;
+        if (_3_found) {
+          __default.PrintBufferSegment(buffer, _1_line__start, new BigInteger((buffer).Length));
+        }
+      }
     }
     public static void _Main(Dafny.ISequence<Dafny.ISequence<Dafny.Rune>> __noArgsParameter)
     {
@@ -6023,7 +6093,6 @@ namespace _module {
       _out3 = FileStream.FileExists(_2_fileArg);
       _3_fileExists = _out3;
       if (!(_3_fileExists)) {
-        Dafny.Helpers.Print((Dafny.Sequence<Dafny.Rune>.UnicodeFromString("NO\n")).ToVerbatimString(false));
         return ;
       }
       bool _4_success;
@@ -6034,7 +6103,6 @@ namespace _module {
       _4_success = _out4;
       _5_len = _out5;
       if ((!(_4_success)) || ((_5_len) < (0))) {
-        Dafny.Helpers.Print((Dafny.Sequence<Dafny.Rune>.UnicodeFromString("NO\n")).ToVerbatimString(false));
         return ;
       }
       bool _6_ok;
@@ -6045,7 +6113,6 @@ namespace _module {
       _6_ok = _out6;
       _7_f = _out7;
       if (!(_6_ok)) {
-        Dafny.Helpers.Print((Dafny.Sequence<Dafny.Rune>.UnicodeFromString("NO\n")).ToVerbatimString(false));
         return ;
       }
       byte[] _8_buffer;
@@ -6055,7 +6122,6 @@ namespace _module {
       _out8 = (_7_f).Read((int)(0), _8_buffer, (int)(0), _5_len);
       _6_ok = _out8;
       if (!(_6_ok)) {
-        Dafny.Helpers.Print((Dafny.Sequence<Dafny.Rune>.UnicodeFromString("NO\n")).ToVerbatimString(false));
         return ;
       }
       bool _9_closeOk;
@@ -6077,20 +6143,7 @@ namespace _module {
         }
         _11_k = (_11_k) + (BigInteger.One);
       }
-      bool _13_found;
-      BigInteger _14_idx;
-      bool _out10;
-      BigInteger _out11;
-      __default.NaiveSearch(_8_buffer, _10_wordBytes, out _out10, out _out11);
-      _13_found = _out10;
-      _14_idx = _out11;
-      if (_13_found) {
-        Dafny.Helpers.Print((Dafny.Sequence<Dafny.Rune>.UnicodeFromString("YES: ")).ToVerbatimString(false));
-        Dafny.Helpers.Print((_14_idx));
-        Dafny.Helpers.Print((Dafny.Sequence<Dafny.Rune>.UnicodeFromString("\n")).ToVerbatimString(false));
-      } else {
-        Dafny.Helpers.Print((Dafny.Sequence<Dafny.Rune>.UnicodeFromString("NO\n")).ToVerbatimString(false));
-      }
+      __default.GrepLines(_8_buffer, _10_wordBytes);
     }
   }
 
@@ -6168,8 +6221,8 @@ namespace _module {
       return _TYPE;
     }
     public static bool _Is(int __source) {
-      BigInteger _15_i = new BigInteger(__source);
-      return ((_15_i).Sign != -1) && ((_15_i) < (new BigInteger(2147483648L)));
+      BigInteger _13_i = new BigInteger(__source);
+      return ((_13_i).Sign != -1) && ((_13_i) < (new BigInteger(2147483648L)));
     }
   }
 

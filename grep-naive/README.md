@@ -66,3 +66,19 @@ To satisfy Dafny's strict array bounds checker, specific algebraic relationships
 ### I/O Preconditions
 
 To satisfy the rigid `Io.dfy` state-machine contracts, explicit boolean status checks were implemented. The environment state (`env.ok.ok()`) mandates that operations like `.Close()` can only be invoked if the preceding `.Read()` or `.Write()` was successful. The code accounts for this by aborting early upon any failed read operation.
+
+## 5. Bonus Implementation: UNIX-Style Output
+To achieve the bonus points, the utility was refactored to mimic the default behavior of the UNIX `grep` command, where it prints the entirety of any line containing a matching string, rather than simply returning a boolean `YES/NO` output.
+
+### Architectural Decisions
+Implementing this directly in a single `while` loop would require tracking `line_start`, `current_index`, and `pattern_index` concurrently. In a state-machine verifier like Dafny, this leads to complex, intertwined invariants that are difficult to prove and maintain. 
+
+To ensure clean verification, the logic was decoupled into modular, isolated methods:
+1. **`GrepLines` (The Scanner):** Iterates over the raw byte buffer, keeping track of a `line_start` pointer. Whenever it encounters a newline byte (`10`) or the End of File (EOF), it identifies a definitive line boundary and passes those bounds `[line_start..i]` to the matching function.
+2. **`ContainsWord` (The Bounded Matcher):** Receives the buffer alongside explicit start and end constraints. It executes the standard naive matching algorithm but is mathematically restricted from scanning past the provided `txtEnd`.
+3. **`PrintBufferSegment` (The Output):** If `ContainsWord` evaluates to `true`, this helper method prints the characters from `line_start` up to the newline.
+
+### Verification Design
+The separation of concerns made bounds checking mathematically straightforward. 
+* In `GrepLines`, the invariant `0 <= line_start <= i + 1` mathematically proves that the start of the line will never surpass the current read head, effectively bounding the chunks.
+* In `ContainsWord`, the invariant `txtStart + i + j <= txtEnd` serves as the core memory safety constraint. Because the string matching logic is strictly bounded by `txtEnd` rather than the total buffer length, Dafny easily proves that array accesses will never bleed into adjacent lines or trigger an out-of-bounds crash.
