@@ -7,12 +7,18 @@
 
 include "Io.dfy"
 
-// 1. LPS (Longest Proper Prefix which is also Suffix) Array Computation
+// LPS (Longest Proper Prefix which is also Suffix) Array Computation
 method ComputeLPS(pat: array<byte>) returns (lps: array<int>)
+    // Precondition: KMP requires a non-empty pattern to establish the LPS array.
     requires pat.Length > 0
+
+    // Postcondition: The resulting jump table must perfectly map to the pattern's length.
     ensures lps.Length == pat.Length
-    // The LPS value can never exceed the current index.
-    // This mathematically proves that j := lps[j-1] will never go out of bounds.
+
+    // Postcondition (Crucial Memory Safety): This mathematically guarantees that the value stored 
+    // in the LPS array at any given index `k` is never larger than `k` itself. 
+    // When the KMP search algorithm jumps backward using `j := lps[j-1]`, this proof 
+    // tells Dafny that the new `j` will never be out of bounds or skip forward illegally.
     ensures forall k :: 0 <= k < lps.Length ==> 0 <= lps[k] <= k
 {
     lps := new int[pat.Length];
@@ -21,11 +27,23 @@ method ComputeLPS(pat: array<byte>) returns (lps: array<int>)
     var i := 1;
     
     while i < pat.Length
-        // The termination metric: a weighted sum that always goes down, 
-        // even when 'len' drops via the LPS array.
+        // Termination Metric: Proves the loop will eventually stop.
+        // During KMP, `len` sometimes decreases (when jumping backward in the pattern). 
+        // If we just used `decreases pat.Length - i`, Dafny would complain on the `else` branch.
+        // By using a weighted sum, even if `len` drops, the eventual increment of `i` 
+        // (which is multiplied by 2) enforces a strict overall downward mathematical trend.        
         decreases 2 * (pat.Length - i) + len
+
+        // Loop Invariant (Bounds): `i` scans forward but never exceeds the pattern length.
         invariant 1 <= i <= pat.Length
+
+        // Loop Invariant (Bounds): The length of the current matching prefix (`len`) 
+        // must always be strictly less than the current read head (`i`). This proves 
+        // that `pat[len]` will never throw an IndexOutOfBounds exception.
         invariant 0 <= len < i
+
+        // Loop Invariant (State): Maintains the mathematical guarantee of the LPS array 
+        // being bounded by its own indices on every single iteration of the loop.
         invariant forall k :: 0 <= k < i ==> 0 <= lps[k] <= k
     {
         if pat[i] == pat[len] {
@@ -43,9 +61,13 @@ method ComputeLPS(pat: array<byte>) returns (lps: array<int>)
     }
 }
 
-// 2. The KMP Search Logic
+// The KMP Search Logic
 method KMPSearch(txt: array<byte>, pat: array<byte>) returns (found: bool, index: int)
+    // Precondition: Cannot search for an empty string.
     requires pat.Length > 0
+
+    // Postcondition: If a match is found, the returned starting index must be a valid 
+    // positive number, and it must leave enough room in the text array for the entire pattern.
     ensures found ==> 0 <= index <= txt.Length - pat.Length
 {
     var M := pat.Length;
@@ -55,11 +77,22 @@ method KMPSearch(txt: array<byte>, pat: array<byte>) returns (found: bool, index
     var j := 0;
 
     while i < N
-        // The magic KMP termination metric.
+        // When a character matches, `i` and `j` both increase. The `(N - i)` term shrinks twice 
+        // as fast as `j` grows, causing the total value to drop. 
+        // When a mismatch occurs, `j` decreases (via the LPS jump table) and `i` stays the same, 
+        // so the total value also drops.
         decreases 2 * (N - i) + j
+
+        // Loop Invariant (Bounds): The text read head stays within the text file bounds.
         invariant 0 <= i <= N
+
+        // Loop Invariant (Bounds): The pattern read head stays within the pattern bounds.
         invariant 0 <= j < M
-        invariant j <= i // Proves that if we find a match, i - j is never negative
+
+        // Loop Invariant (Logic Safety): The pattern index (`j`) can never outpace the 
+        // text index (`i`). This is the critical proof required by Dafny to ensure that 
+        // returning `i - j` upon a successful match will not yield a negative index.
+        invariant j <= i
     {
         if pat[j] == txt[i] {
             j := j + 1;
@@ -67,11 +100,14 @@ method KMPSearch(txt: array<byte>, pat: array<byte>) returns (found: bool, index
         }
 
         if j == M {
+            // Match found! `i` is at the end of the match, so the start is `i - j`.
             return true, i - j;
         } else if i < N && pat[j] != txt[i] {
             if j != 0 {
-                j := lps[j - 1]; // Safe because lps[j-1] < j
+                // Mismatch after some matches. Jump j backward using the verified LPS table.
+                j := lps[j - 1];
             } else {
+                // Mismatch on the very first character. Just advance the text pointer.
                 i := i + 1;
             }
         }
@@ -79,9 +115,14 @@ method KMPSearch(txt: array<byte>, pat: array<byte>) returns (found: bool, index
     return false, -1;
 }
 
-// 3. The Main Executable
+// The Main Executable
 method {:main} Main(ghost env: HostEnvironment?)
+    // Precondition (I/O State): The program can only start if the host environment is 
+    // initialized, valid, and the internal file system state hasn't crashed.
     requires env != null && env.Valid() && env.ok.ok()
+
+    // Modification Framing: Explicitly tells the verifier this method is allowed 
+    // to alter the success state (`env.ok`) and the file system trackers (`env.files`).
     modifies env.ok
     modifies env.files
 {
@@ -101,7 +142,7 @@ method {:main} Main(ghost env: HostEnvironment?)
 
     var fileExists := FileStream.FileExists(fileArg, env);
     if !fileExists {
-        print "NO\n"; // Standard grep fails silently or prints nothing, but adhering to the project YES/NO theme.
+        print "NO\n";
         return;
     }
 
@@ -125,12 +166,13 @@ method {:main} Main(ghost env: HostEnvironment?)
     }
     var closeOk := f.Close();
 
-    // 4. Safe Char-to-Byte Conversion
+    // Safe Char-to-Byte Conversion
     // Command line args are chars, but file contents are bytes. 
-    // We must safely map them without violating Dafny's strict byte bounds (0-255).
+    // Safely map them without violating Dafny's strict byte bounds (0-255).
     var wordBytes := new byte[wordArg.Length];
     var k := 0;
     while k < wordArg.Length
+        // Loop Invariant (Bounds): Standard bounds proof for iterating over the argument string.
         invariant 0 <= k <= wordArg.Length
     {
         var charVal := wordArg[k] as int;
@@ -139,7 +181,7 @@ method {:main} Main(ghost env: HostEnvironment?)
         k := k + 1;
     }
 
-    // 5. Execution & Output formatting
+    // Execution & Output formatting
     var found, idx := KMPSearch(buffer, wordBytes);
 
     if found {

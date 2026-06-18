@@ -1,7 +1,7 @@
 ### Challenge 2: Verified Grep Utility (Knuth-Morris-Pratt Algorithm)
 
 ## 1. Overview
-This directory contains the verified implementation of the `grep` utility using the Knuth-Morris-Pratt (KMP) string-matching algorithm, written in Dafny. This implementation successfully satisfies the requirement for a verified linear-time pattern matching utility. 
+This directory contains the verified implementation of the `grep` utility using the Knuth-Morris-Pratt (KMP) string-matching algorithm, written in Dafny. 
 
 The program takes a search word and a file name as command-line arguments. It safely processes the file system I/O and outputs `YES: n` (where `n` is the starting byte index of the match) or `NO` if the word is not found or an I/O error occurs.
 
@@ -24,17 +24,13 @@ Dafny.exe build .\grep.dfy .\IoNative.cs
 ```bash
 # Windows (.exe):
 .\grep.exe "SearchTerm" target_file.txt
-
-# Cross-platform (.dll):
-dotnet grep.dll "SearchTerm" target_file.txt
-
 ```
 
----
+--- 
 
 ## 3. Algorithm Description
 
-To achieve the full marks designated for Challenge 2, this solution implements the Knuth-Morris-Pratt string searching algorithm. This avoids the quadratic time complexity of the naive approach, resolving the search in $O(N + M)$ time.
+As told before, this solution implements the Knuth-Morris-Pratt string searching algorithm. This avoids the quadratic time complexity of the naive approach, resolving the search in $O(N + M)$ time.
 
 The algorithm is split into two verified phases:
 

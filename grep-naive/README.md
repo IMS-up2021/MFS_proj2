@@ -25,10 +25,6 @@ Run the compiled executable with the search word and the target file:
 ```bash
 # Windows (.exe):
 .\grep.exe "SearchTerm" target_file.txt
-
-# Cross-platform (.dll):
-dotnet grep.dll "SearchTerm" target_file.txt
-
 ```
 
 ---
@@ -68,7 +64,7 @@ To satisfy Dafny's strict array bounds checker, specific algebraic relationships
 To satisfy the rigid `Io.dfy` state-machine contracts, explicit boolean status checks were implemented. The environment state (`env.ok.ok()`) mandates that operations like `.Close()` can only be invoked if the preceding `.Read()` or `.Write()` was successful. The code accounts for this by aborting early upon any failed read operation.
 
 ## 5. Bonus Implementation: UNIX-Style Output
-To achieve the bonus points, the utility was refactored to mimic the default behavior of the UNIX `grep` command, where it prints the entirety of any line containing a matching string, rather than simply returning a boolean `YES/NO` output.
+Have been implemented an output format to mimic the default behavior of the UNIX `grep` command, where it prints the entirety of any line containing a matching string, rather than simply returning a boolean `YES/NO` output.
 
 ### Architectural Decisions
 Implementing this directly in a single `while` loop would require tracking `line_start`, `current_index`, and `pattern_index` concurrently. In a state-machine verifier like Dafny, this leads to complex, intertwined invariants that are difficult to prove and maintain. 

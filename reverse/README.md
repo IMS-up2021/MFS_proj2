@@ -17,22 +17,9 @@ Main guarantees covered by the implementation:
 - It reads source bytes, reverses line order, and writes output.
 - It checks open/read/write/close results and reports errors.
 
-## Files
-
-- [reverse.dfy](reverse.dfy): Dafny implementation and verified logic.
-- [Io.dfy](Io.dfy): I/O interface contracts used by verification.
-- [IoNative.cs](IoNative.cs): C# runtime bindings for file/args operations.
-- [Makefile](Makefile): Build/compile helper.
-
 ## Build and run
 
-### 1. Go to this folder
-
-```bash
-cd reverse
-```
-
-### 2. Compile
+### 1. Compile
 
 Option A (with `make`):
 
@@ -48,7 +35,7 @@ dafny reverse.dfy IoNative.cs
 
 If `make compile` returns exit code `127`, your shell likely cannot find the Dafny executable configured in [Makefile](Makefile). In that case, run the direct Dafny command with the full Dafny path.
 
-### 3. Execute
+### 2. Execute
 
 Windows PowerShell example:
 
